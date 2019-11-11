@@ -669,10 +669,11 @@ https://docs.travis-ci.com/user/common-build-problems/#my-builds-are-timing-out
 
 `travis_wait` - default (10 minutes)
 
-## Slack notofication integration
+## Slack notification integration
 
 Don't forget to run:
-```travis encrypt "<slack_workspace_name>:<token_from_slack>#<channel_name>" --add notifications.slack.rooms --com
+```
+travis encrypt "<slack_workspace_name>:<token_from_slack>#<channel_name>" --add notifications.slack.rooms --com
 ```
 
 TOKEN gets from the slack https://devops-team-otus.slack.com/services/BNEBBF52T
