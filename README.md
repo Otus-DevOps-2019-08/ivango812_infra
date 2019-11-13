@@ -500,3 +500,180 @@ Run trytravis
 ```
 trytravis
 ```
+
+# Lesson 13
+
+Learning vagrant for testing playbooks, use roles for packer image building, move role to separated git repository, molecule + testinfra for testing roles and playbooks, travis + gcp for testing roles.
+
+## Vagrant
+
+Install [Vagrant](https://www.vagrantup.com)
+
+Create `Vagrantfile` file that describes infrastructure - two instances `dbserver` and `appserver`
+
+```
+vagrant up
+```
+
+Image in vagrant named - `box`
+To whatch a list of downloaded boxes:
+
+```
+vagrant box list
+```
+
+VM statuses:
+
+```
+vagrant status
+```
+
+To login into VM:
+
+```
+vagrant ssh appserver
+```
+
+Add ansible provisiners to our Vagrantfile
+
+[Vagrantfile#L12](https://github.com/Otus-DevOps-2019-08/ivango812_infra/blob/ansible-4/ansible/Vagrantfile#L12)
+[Vagrantfile#L26](https://github.com/Otus-DevOps-2019-08/ivango812_infra/blob/ansible-4/ansible/Vagrantfile#L26)
+
+Run provisioner:
+
+```
+vagrant provision dbserver
+```
+
+### Inventory when using vagrant
+
+Vagrant automatically creates inventory
+To see vagrant inventory file:
+
+```
+cat .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory
+```
+
+### Destroy VM
+
+```
+vagrant destroy -f
+```
+
+## Testing with molecule + testinfra
+
+Create file `ansible/requirements.txt`:
+
+```
+ansible>=2.4
+molecule>=2.6 
+testinfra>=1.10 
+python-vagrant>=0.5.15
+```
+
+```
+pip install -r requirements.txt
+```
+
+Use `virtualenv` to create environment
+
+To create test skelet:
+
+```
+molecule init scenario --scenario-name default -r db -d vagrant
+```
+
+Then create tests in `test_default.py`
+
+Test VM images placed in `molecule/default/molecule.yml` in `platforms.box` section.
+
+To create test VM:
+
+```
+molecule create
+molecule list
+```
+
+```
+molecule login -h instance
+```
+
+Apply `playbook.yml`:
+
+```
+molecule converge
+```
+
+Run test:
+
+```
+molecule verify
+```
+
+## Travis + GCP test
+
+I moved role `db` to the separated git repository https://github.com/ivango812/ansible_mongo_role
+
+Use GCP instance to test the `role` in the Travis - https://github.com/ivango812/ansible_mongo_role/blob/master/molecule/default/create.yml
+
+Added test build badge to README and added slack notification from *Github* and *Travis*.
+
+Configuring travis test using GCP instance:
+https://github.com/ivango812/ansible_mongo_role/blob/master/.travis.yml
+
+
+Generate key for SSH cennection
+
+```
+ssh-keygen -t rsa -f google_compute_engine -C 'travis' -q -N ''
+```
+
+Create KEY in metadata in project Infra on GCP
+
+```
+pbcopy < google_compute_engine.pub # OSX specific command
+```
+
+`pbcopy` - copying to the local keyboard buffer
+
+Create service account in GCP and download `credentials.json`
+
+Login into Travis and encrypt some secrets:
+
+```
+travis login --com
+travis encrypt GCE_SERVICE_ACCOUNT_EMAIL='ci-test@infra-179032.iam.gserviceaccount.com' --add --com
+travis encrypt GCE_CREDENTIALS_FILE="$(pwd)/credentials.json" --add --com
+travis encrypt GCE_PROJECT_ID='infra-179032' --add --com
+```
+
+Lets encrypt sensetive files:
+
+```
+tar cvf secrets.tar credentials.json google_compute_engine
+travis encrypt-file secrets.tar --add --com
+```
+
+Finally push all changes:
+```
+git commit -m 'Added Travis integration'
+git push
+```
+
+Notes:
+If GCP instance configuring too long time (for example `apt update` or something similar) you can use travis options:
+
+https://docs.travis-ci.com/user/common-build-problems/#my-builds-are-timing-out
+
+`travis_wait` or `travis_retry`
+
+`travis_wait` - default (10 minutes)
+
+## Slack notification integration
+
+Don't forget to run:
+```
+travis encrypt "<slack_workspace_name>:<token_from_slack>#<channel_name>" --add notifications.slack.rooms --com
+```
+
+TOKEN gets from the slack https://devops-team-otus.slack.com/services/BNEBBF52T
